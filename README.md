@@ -2,7 +2,6 @@
 
 A Python meeting and video assistant built with Streamlit. Bring a transcript, import available YouTube captions, or enable audio transcription; review summaries and decisions, track action items, ask questions with source citations, and export the report.
 
-This project targets a controlled organizational pilot. It includes application access controls, persistent jobs, PostgreSQL support, migrations, tests, and deployment packaging. A public deployment, load validation, disaster-recovery exercise, or compliance certification is not implied by the code being present. The release status and hosted URL must be recorded after deployment in [the deployment record](docs/DEPLOYMENT.md#deployment-record).
 
 ## Run locally
 
