@@ -1,0 +1,11 @@
+# Direct runtime dependencies. requirements.txt contains the reviewed pins.
+streamlit>=1.63,<2
+SQLAlchemy>=2.0,<3
+alembic>=1.19,<2
+argon2-cffi>=25.1,<26
+httpx>=0.28,<0.29
+psycopg[binary]>=3.3,<4
+fpdf2>=2.8,<3
+uharfbuzz>=0.56,<0.57
+Authlib>=1.8,<2
+youtube-transcript-api>=1.2,<2

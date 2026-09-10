@@ -1,0 +1,12 @@
+# Reviewed direct dependency pins, validated with Python 3.13.
+# Transitive dependencies are resolved by pip; this is not a hash-locked manifest.
+streamlit==1.63.0
+SQLAlchemy==2.0.52
+alembic==1.19.2
+argon2-cffi==25.1.0
+httpx==0.28.1
+psycopg[binary]==3.3.5
+fpdf2==2.8.8
+uharfbuzz==0.56.1
+Authlib==1.8.0
+youtube-transcript-api==1.2.4

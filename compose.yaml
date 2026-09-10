@@ -1,0 +1,68 @@
+# Local PostgreSQL deployment rehearsal. Supply .env as documented in README.
+# For an internet-facing deployment, provide HTTPS and an operated database.
+x-application: &application
+  build:
+    context: .
+    args:
+      INSTALL_WHISPER: ${INSTALL_WHISPER:-false}
+  environment: &app-environment
+    APP_ENV: production
+    DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the ignored .env file}
+    AUTH_MODE: ${AUTH_MODE:-password}
+    ALLOW_SIGNUP: "false"
+    BRIEFLY_EMBEDDED_WORKER: "false"
+    MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+    MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-small-latest}
+    TRANSCRIPTION_BACKEND: ${TRANSCRIPTION_BACKEND:-disabled}
+    SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+    SARVAM_MODEL: ${SARVAM_MODEL:-saaras:v3}
+    WHISPER_MODEL: ${WHISPER_MODEL:-small}
+    WHISPER_ALLOW_DOWNLOAD: ${WHISPER_ALLOW_DOWNLOAD:-false}
+    WHISPER_DEVICE: cpu
+    WHISPER_COMPUTE_TYPE: int8
+    OIDC_ALLOWED_DOMAINS: ${OIDC_ALLOWED_DOMAINS:-}
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=512m,mode=1777
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  web:
+    <<: *application
+    ports:
+      - "127.0.0.1:8501:8501"
+    mem_limit: 1g
+
+  worker:
+    <<: *application
+    command: ["python", "-m", "briefly.worker"]
+    healthcheck:
+      disable: true
+    stop_grace_period: 45s
+    mem_limit: 2g
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in the ignored .env file}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in the ignored .env file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the ignored .env file}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    mem_limit: 1g
+
+volumes:
+  postgres_data:

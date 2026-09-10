@@ -1,0 +1,3 @@
+# Optional local audio/video inference. Model weights are provisioned separately.
+-r requirements.txt
+faster-whisper==1.2.1
