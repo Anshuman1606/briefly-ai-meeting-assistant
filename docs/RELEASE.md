@@ -1,6 +1,6 @@
 # Streamlit release handoff
 
-The application is prepared for deployment to Streamlit Community Cloud. It has not been published to a cloud URL.
+The application is published in the private [GitHub repository](https://github.com/Anshuman1606/briefly-ai-meeting-assistant) and prepared for Streamlit Community Cloud. The hosted application is not live yet.
 
 ## Release settings
 
@@ -27,12 +27,14 @@ Use the actual repository URL and deployed commit in the deployment record once 
 - TXT, JSON and PDF reports were generated. English and Hindi Unicode PDF generation succeeded.
 - The local Streamlit health endpoint returned HTTP 200.
 
-These checks do not establish an enterprise SLA, production load capacity, or compliance certification. PostgreSQL CI, the Docker deployment, live Mistral/Sarvam requests, organization SSO, and hosted browser checks remain unverified until their services are available. PDF generation was exercised; a separate visual layout review was not performed.
+GitHub Actions also passed the PostgreSQL 17 integration test on 2026-09-10, covering migrations, tenant isolation, PDF/JSON exports, and persistence after a real database restart. The [verified CI run](https://github.com/Anshuman1606/briefly-ai-meeting-assistant/actions/runs/34456624224) tests code release `9d1d5a76e890996a43b521e85191967a052a625c`.
+
+These checks do not establish an enterprise SLA, production load capacity, or compliance certification. The full Docker deployment, live Mistral/Sarvam requests, organization SSO, and hosted browser checks remain unverified until their services are available. PDF generation was exercised; a separate visual layout review was not performed.
 
 ## Account-dependent steps still required
 
-1. Select a GitHub repository owned or administered by the deployment operator and authorize source publication to it.
-2. Push the prepared release and run GitHub Actions, including the PostgreSQL integration job.
+1. Completed: private GitHub repository created under `Anshuman1606`.
+2. Completed: release pushed and GitHub Actions passed, including the PostgreSQL integration job.
 3. Connect the repository in Streamlit Community Cloud.
 4. Configure a dedicated PostgreSQL connection in app secrets. Keep `APP_ENV="production"` and `ALLOW_SIGNUP=false`.
 5. Provision the initial owner with the operator CLI, or configure verified organization OIDC. Enable optional provider integrations only after their credentials and limits are configured.

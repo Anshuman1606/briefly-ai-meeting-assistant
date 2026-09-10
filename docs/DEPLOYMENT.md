@@ -154,13 +154,13 @@ Fill this in when the hosted release is verified:
 
 | Field | Verified value |
 | --- | --- |
-| GitHub repository | Pending |
-| Deployment branch and commit | Pending |
-| Python version | Pending |
+| GitHub repository | [Anshuman1606/briefly-ai-meeting-assistant](https://github.com/Anshuman1606/briefly-ai-meeting-assistant), private |
+| Deployment branch and commit | `codex/briefly`; code release `9d1d5a76e890996a43b521e85191967a052a625c` |
+| Python version | 3.13, verified in GitHub Actions |
 | Hosted application URL | Pending |
 | Database and backup owner | Pending |
 | Access mode / identity provider | Pending |
-| Smoke-test time and result | Pending |
+| Smoke-test time and result | GitHub CI passed on 2026-09-10 at 08:44 UTC, including PostgreSQL migrations, isolation, exports and restart recovery. Hosted Streamlit smoke tests remain pending. |
 | Rollback commit | Pending |
 
 Official hosting documentation reviewed on 2026-09-09. Recheck provider documentation before later deployments because platform defaults and limits can change.
