@@ -14,7 +14,7 @@ from alembic.migration import MigrationContext
 from sqlalchemy import func, select
 
 from briefly.models import Action, AuthSession, Chat, Chunk, Meeting, now
-from briefly.service import MAX_TRANSCRIPT, Service
+from briefly.service import MAX_TRANSCRIPT_BYTES, Service
 
 
 TEXT = "[00:00] Maya: We agreed to ship the dashboard.\n[00:30] Arjun: I will test exports by Friday."
@@ -371,7 +371,7 @@ class ServiceTests(unittest.TestCase):
             {"title": "x" * 161, "source_type": "transcript", "transcript": TEXT},
             {"title": "Meeting", "source_type": "arbitrary", "transcript": TEXT},
             {"title": "Meeting", "source_type": "transcript", "transcript": "too short"},
-            {"title": "Meeting", "source_type": "transcript", "transcript": "x" * (MAX_TRANSCRIPT + 1)},
+            {"title": "Meeting", "source_type": "transcript", "transcript": "x" * (MAX_TRANSCRIPT_BYTES + 1)},
             {"title": "Meeting", "source_type": "transcript", "transcript": TEXT, "language": "invalid"},
             {"title": "Meeting", "source_type": "youtube", "source_url": "http://127.0.0.1/admin"},
             {"title": "Meeting", "source_type": "youtube", "source_url": "https://youtube.com.evil.example/watch?v=xlYJhtL0qbQ"},
@@ -382,12 +382,14 @@ class ServiceTests(unittest.TestCase):
                 self.service.create_meeting(self.owner, **kwargs)
         self.assertEqual([], self.service.list_meetings(self.owner))
 
-    def test_ingestion_and_intelligence_transcript_limits_agree(self):
-        from briefly.intelligence import MAX_TRANSCRIPT_CHARS
-        self.assertEqual(MAX_TRANSCRIPT_CHARS, MAX_TRANSCRIPT)
+    def test_ingestion_counts_utf8_bytes(self):
+        with patch("briefly.service.MAX_TRANSCRIPT_BYTES", 100):
+            with self.assertRaisesRegex(ValueError, "UTF-8"):
+                self.service.create_meeting(self.owner, "Hindi", "transcript", transcript="ह" * 41)
+            self.service.create_meeting(self.owner, "English", "transcript", transcript="a" * 60)
 
     def test_upload_bound_and_filename_sanitization(self):
-        with patch.dict(os.environ, {"TRANSCRIPTION_BACKEND": "sarvam"}):
+        with patch.dict(os.environ, {"TRANSCRIPTION_BACKEND": "sarvam"}), patch("briefly.service.MAX_UPLOAD", 25 * 1024 * 1024):
             for data, filename in [(b"", "meeting.wav"), (b"x", "meeting.exe"), (b"x" * (25 * 1024 * 1024 + 1), "meeting.wav")]:
                 with self.subTest(filename=filename, size=len(data)), self.assertRaises(ValueError):
                     self.service.create_meeting(self.owner, "Audio", "audio", file_bytes=data, filename=filename)

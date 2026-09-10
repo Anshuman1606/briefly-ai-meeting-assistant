@@ -63,8 +63,8 @@ class IntelligenceTests(unittest.TestCase):
         self.assertEqual(chunks[0]["text"], "Launch is approved.")
 
     def test_input_and_chunk_bounds_are_explicit(self):
-        with self.assertRaisesRegex(subject.IntelligenceError, "too long"):
-            subject.analyze_transcript("a" * (subject.MAX_TRANSCRIPT_CHARS + 1))
+        with self.assertRaisesRegex(subject.IntelligenceError, "20 MB"):
+            subject.analyze_transcript("a" * (subject.MAX_TRANSCRIPT_BYTES + 1))
         with self.assertRaisesRegex(subject.IntelligenceError, "empty"):
             subject.analyze_transcript(" \n ")
         with self.assertRaisesRegex(subject.IntelligenceError, "too long"):

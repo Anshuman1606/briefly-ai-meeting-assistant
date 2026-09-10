@@ -22,12 +22,13 @@ import wave
 from urllib.parse import parse_qs, urlsplit
 
 
-MAX_TRANSCRIPT_CHARS = 100_000
+MAX_TRANSCRIPT_BYTES = 20 * 1024 * 1024
 MAX_QUESTION_CHARS = 1_000
 MAX_CHUNK_CHARS = 1_000
-MAX_CHUNKS = 2_000
-MAX_MEDIA_BYTES = 100 * 1024 * 1024
-MAX_MEDIA_SECONDS = 7_200
+MAX_MEDIA_BYTES = 200 * 1024 * 1024
+MAX_MEDIA_SECONDS = 12 * 3600
+ANALYSIS_BATCH_BYTES = 16_000
+ANALYSIS_BATCH_SEGMENTS = 12
 MAX_PROVIDER_RESPONSE_BYTES = 512 * 1024
 MISTRAL_ENDPOINT = "https://api.mistral.ai/v1/chat/completions"
 SARVAM_ENDPOINT = "https://api.sarvam.ai/speech-to-text"
@@ -61,11 +62,13 @@ _DECISION = re.compile(
 _SPEAKER = re.compile(r"^([\w][\w .'-]{0,48}):\s*(.+)$", re.UNICODE)
 
 
-def _bounded_text(text: str, limit: int = MAX_TRANSCRIPT_CHARS, label: str = "Transcript") -> str:
+def _bounded_text(text: str, limit: int | None = None, label: str = "Transcript") -> str:
     if not isinstance(text, str):
         raise IntelligenceError(f"{label} must be text.")
-    if len(text) > limit:
+    if limit is not None and len(text) > limit:
         raise IntelligenceError(f"{label} is too long. The limit is {limit:,} characters.")
+    if limit is None and len(text.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
+        raise IntelligenceError("Transcript exceeds the 20 MB text capacity.")
     cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text).strip()
     if not cleaned:
         raise IntelligenceError(f"{label} is empty. Add some text and try again.")
@@ -107,17 +110,19 @@ def split_transcript(text: str) -> list[dict]:
         if not line:
             continue
         for sentence in re.split(r"(?<=[.!?।])\s+", line):
-            while sentence:
-                end = min(len(sentence), MAX_CHUNK_CHARS)
+            offset = 0
+            while offset < len(sentence):
+                end = min(len(sentence), offset + MAX_CHUNK_CHARS)
                 if len(sentence) > end:
-                    end = sentence.rfind(" ", 0, end) or end
-                    if end < 1:
-                        end = MAX_CHUNK_CHARS
-                piece, sentence = sentence[:end].strip(), sentence[end:].strip()
+                    space = sentence.rfind(" ", offset, end)
+                    if space > offset:
+                        end = space
+                piece = sentence[offset:end].strip()
+                offset = end
+                while offset < len(sentence) and sentence[offset].isspace():
+                    offset += 1
                 if piece:
                     chunks.append({"index": len(chunks), "text": piece, "start": start})
-                    if len(chunks) > MAX_CHUNKS:
-                        raise IntelligenceError("Transcript has too many segments. Combine very short lines and retry.")
     if not chunks:
         raise IntelligenceError("No spoken text was found in the transcript.")
     return chunks
@@ -171,8 +176,8 @@ def _extractive_analysis(chunks: list[dict]) -> dict:
     )
     chosen = sorted(ranked[:5], key=lambda pair: pair[0])
     return {
-        "summary": [sentence for _, sentence in chosen], "actions": actions[:20],
-        "decisions": decisions[:12], "questions": questions[:12], "mode": "extractive",
+        "summary": [sentence for _, sentence in chosen], "actions": actions,
+        "decisions": decisions, "questions": questions, "mode": "extractive",
     }
 
 
@@ -272,11 +277,7 @@ def _verified_quote(value, sources: list[str]) -> str:
     return value if any(value in source for source in sources) else ""
 
 
-def analyze_transcript(text: str) -> dict:
-    """Extract source-backed highlights, commitments, decisions, and questions."""
-    chunks = split_transcript(text)
-    if not os.getenv("MISTRAL_API_KEY", "").strip():
-        return _extractive_analysis(chunks)
+def _analyze_batch(chunks: list[dict]) -> dict:
     safe = [chunk for chunk in chunks if not _INSTRUCTION.search(chunk["text"])]
     if not safe:
         return {"summary": [], "actions": [], "decisions": [], "questions": [], "mode": "mistral"}
@@ -322,8 +323,38 @@ def analyze_transcript(text: str) -> dict:
     return verified
 
 
+def analyze_transcript(text: str) -> dict:
+    """Analyze every segment with bounded provider requests and merge evidence."""
+    chunks = split_transcript(text)
+    if not os.getenv("MISTRAL_API_KEY", "").strip():
+        return _extractive_analysis(chunks)
+    merged = {"summary": [], "actions": [], "decisions": [], "questions": [], "mode": "mistral"}
+    batch, size = [], 0
+
+    def consume(items):
+        result = _analyze_batch(items)
+        for key in ("summary", "actions", "decisions", "questions"):
+            merged[key].extend(result[key])
+
+    for chunk in chunks:
+        cost = len(json.dumps(chunk, ensure_ascii=False).encode("utf-8")) + 2
+        if batch and (size + cost > ANALYSIS_BATCH_BYTES or len(batch) >= ANALYSIS_BATCH_SEGMENTS):
+            consume(batch)
+            batch, size = [], 0
+        batch.append(chunk)
+        size += cost
+    if batch:
+        consume(batch)
+    for key in ("summary", "decisions", "questions"):
+        merged[key] = list(dict.fromkeys(merged[key]))
+    merged["actions"] = list({json.dumps(item, sort_keys=True): item for item in merged["actions"]}.values())
+    if len(merged["summary"]) > 5:
+        merged["summary"] = _extractive_analysis([{"text": text} for text in merged["summary"]])["summary"]
+    return merged
+
+
 def _validated_chunks(chunks: list[dict]) -> list[dict]:
-    if not isinstance(chunks, list) or len(chunks) > MAX_CHUNKS:
+    if not isinstance(chunks, list):
         raise IntelligenceError("The transcript segments are invalid or too numerous.")
     result, seen, total = [], set(), 0
     for chunk in chunks:
@@ -336,8 +367,8 @@ def _validated_chunks(chunks: list[dict]) -> list[dict]:
         if type(start) not in (int, float) or not math.isfinite(start) or start < 0:
             raise IntelligenceError("The transcript timestamps are invalid.")
         seen.add(index)
-        total += len(text)
-        if total > MAX_TRANSCRIPT_CHARS:
+        total += len(text.encode("utf-8"))
+        if total > MAX_TRANSCRIPT_BYTES:
             raise IntelligenceError("The transcript exceeds the supported size.")
         if not _INSTRUCTION.search(text):
             result.append({"index": index, "text": text, "start": float(start)})
@@ -484,9 +515,9 @@ def fetch_youtube_transcript(url: str) -> str:
                 if not math.isfinite(start) or start < 0:
                     raise IntelligenceError("YouTube returned invalid caption timestamps.")
                 line = f"[{_time_label(start)}] {text}"
-                size += len(line) + 1
-                if size > MAX_TRANSCRIPT_CHARS:
-                    raise IntelligenceError("This video's captions exceed the 100,000-character limit. Import a shorter excerpt.")
+                size += len(line.encode("utf-8")) + 1
+                if size > MAX_TRANSCRIPT_BYTES:
+                    raise IntelligenceError("This video's captions exceed the 20 MB text capacity.")
                 lines.append(line)
         return _bounded_text("\n".join(lines))
     except IntelligenceError:
@@ -520,21 +551,53 @@ def _whisper_model():
         ) from None
 
 
+def _audio_batches(path: Path, seconds: int = 300):
+    """Decode bounded mono 16 kHz blocks; never decode the whole recording."""
+    import av
+    import numpy as np
+    rate = 16000
+    capacity = seconds * rate
+    buffer = np.empty(capacity, dtype=np.float32)
+    used = total = 0
+    with av.open(str(path)) as container:
+        resampler = av.AudioResampler(format="fltp", layout="mono", rate=rate)
+        def frames():
+            for frame in container.decode(audio=0):
+                yield from resampler.resample(frame)
+            yield from resampler.resample(None)
+        for frame in frames():
+            samples = frame.to_ndarray().reshape(-1)
+            offset = 0
+            while offset < len(samples):
+                take = min(capacity - used, len(samples) - offset)
+                buffer[used:used + take] = samples[offset:offset + take]
+                used += take
+                offset += take
+                if total + used > MAX_MEDIA_SECONDS * rate:
+                    raise IntelligenceError("Audio must be no longer than 12 hours.")
+                if used == capacity:
+                    yield total / rate, buffer.copy()
+                    total += used
+                    used = 0
+        if used:
+            yield total / rate, buffer[:used].copy()
+
+
 def _transcribe_whisper(path: Path, language: str) -> str:
     try:
-        segments, info = _whisper_model().transcribe(
-            str(path), language=None if language in {"auto", "hinglish"} else language,
-            beam_size=5, vad_filter=True, condition_on_previous_text=False,
-        )
-        if info.duration > MAX_MEDIA_SECONDS:
-            raise IntelligenceError("Audio must be no longer than two hours.")
+        model = _whisper_model()
         lines, size = [], 0
-        for segment in segments:
-            line = f"[{_time_label(segment.start)}] {segment.text.strip()}"
-            size += len(line) + 1
-            if size > MAX_TRANSCRIPT_CHARS:
-                raise IntelligenceError("The audio transcript exceeds the supported size. Import a shorter excerpt.")
-            lines.append(line)
+        for offset, audio in _audio_batches(path):
+            segments, _ = model.transcribe(
+                audio, language=None if language in {"auto", "hinglish"} else language,
+                beam_size=5, vad_filter=True, condition_on_previous_text=False,
+            )
+            for segment in segments:
+                line = f"[{_time_label(offset + segment.start)}] {segment.text.strip()}"
+                size += len(line.encode("utf-8")) + 1
+                if size > MAX_TRANSCRIPT_BYTES:
+                    raise IntelligenceError("The audio transcript exceeds the 20 MB text capacity.")
+                lines.append(line)
         return _bounded_text("\n".join(lines))
     except IntelligenceError:
         raise
@@ -554,7 +617,7 @@ def _transcribe_sarvam(path: Path, language: str) -> str:
         with wave.open(str(path), "rb") as source:
             duration = source.getnframes() / source.getframerate()
             if not 0 < duration <= MAX_MEDIA_SECONDS:
-                raise IntelligenceError("Audio must contain speech and be no longer than two hours.")
+                raise IntelligenceError("Audio must contain speech and be no longer than 12 hours.")
             params = source.getparams()
             step = 25 * source.getframerate()
             lines, size, chunk_number = [], 0, 0
@@ -579,8 +642,8 @@ def _transcribe_sarvam(path: Path, language: str) -> str:
                         raise IntelligenceError("Sarvam returned an invalid transcript. Please retry.")
                     if text.strip():
                         line = f"[{_time_label(chunk_number * 25)}] {text.strip()}"
-                        size += len(line) + 1
-                        if size > MAX_TRANSCRIPT_CHARS:
+                        size += len(line.encode("utf-8")) + 1
+                        if size > MAX_TRANSCRIPT_BYTES:
                             raise IntelligenceError("The audio transcript exceeds the supported size.")
                         lines.append(line)
                     chunk_number += 1
@@ -603,10 +666,10 @@ def transcribe_file(path, language: str = "auto") -> str:
     if candidate.is_symlink() or not candidate.is_file():
         raise IntelligenceError("The uploaded file is unavailable.")
     if not 0 < candidate.stat().st_size <= MAX_MEDIA_BYTES:
-        raise IntelligenceError("Upload a nonempty file smaller than 100 MB.")
+        raise IntelligenceError("Upload a nonempty file up to 200 MB.")
     extension = candidate.suffix.lower()
     if extension in {".txt", ".srt", ".vtt"}:
-        if candidate.stat().st_size > MAX_TRANSCRIPT_CHARS * 4:
+        if candidate.stat().st_size > MAX_TRANSCRIPT_BYTES * 4:
             raise IntelligenceError("The transcript file exceeds the supported size.")
         try:
             return _bounded_text(candidate.read_text(encoding="utf-8-sig"))

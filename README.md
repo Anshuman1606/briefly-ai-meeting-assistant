@@ -22,9 +22,9 @@ The database schema is initialized on startup through the versioned migrations. 
 
 | Capability | Implementation |
 | --- | --- |
-| Transcript ingestion | Paste text; 40–100,000 characters per transcript. |
+| Transcript ingestion | Paste text; At least 40 characters; up to 20 MB of UTF-8 text, with no 100,000-character restriction. |
 | YouTube import | Captions fetched from validated YouTube URLs. Restricted videos, missing captions, or host blocking can prevent import; paste a transcript in those cases. |
-| Media transcription | Optional local Whisper for supported audio/video, or Sarvam for Hindi/Hinglish PCM WAV. Uploads are limited to 25 MB and media to two hours; shorter files suit shared hosting. |
+| Media transcription | Configurable local Whisper for supported audio/video, or Sarvam for Hindi/Hinglish PCM WAV. Uploads are limited to 200 MB and media to 12 hours; shorter files suit shared hosting. |
 | Analysis | Summaries, decisions, unresolved questions, and action items with supporting evidence. Optional Mistral generation; extractive analysis otherwise. |
 | Meeting questions | Answers from retrieved transcript excerpts with source citations; insufficient evidence is handled explicitly. |
 | Action tracking | Owners and editors can mark actions complete. Owners and dates extracted from speech still need review. |

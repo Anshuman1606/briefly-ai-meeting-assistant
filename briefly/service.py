@@ -20,7 +20,7 @@ from sqlalchemy import and_, create_engine, delete, event, func, or_, select, up
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import defer, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from briefly.models import (
@@ -28,9 +28,11 @@ from briefly.models import (
     User, Workspace, now, uid,
 )
 
+from briefly.intelligence import MAX_MEDIA_BYTES, MAX_TRANSCRIPT_BYTES
+
 LOG = logging.getLogger("briefly")
-MAX_UPLOAD = 25 * 1024 * 1024
-MAX_TRANSCRIPT = 100_000
+
+MAX_UPLOAD = MAX_MEDIA_BYTES
 SAMPLE = """[00:00] Maya: Welcome to the Atlas launch review. Our goal is to launch the customer dashboard on October 15. Today we need to agree on scope and ownership.
 [00:38] Arjun: The dashboard is ready for the pilot. We have completed all twelve core reports, but the CSV export still needs testing with large accounts.
 [01:12] Maya: We decided to launch with the twelve core reports and move custom report builders to the next release. The October 15 launch date is confirmed.
@@ -244,7 +246,7 @@ class Service:
 
     def _meeting(self, s, user, meeting_id, roles=None):
         _, member, account = self._identity(s, user, roles)
-        meeting = s.scalar(select(Meeting).where(Meeting.id == meeting_id, Meeting.workspace_id == member.workspace_id, Meeting.deleted_at.is_(None)))
+        meeting = s.scalar(select(Meeting).options(defer(Meeting.upload)).where(Meeting.id == meeting_id, Meeting.workspace_id == member.workspace_id, Meeting.deleted_at.is_(None)))
         if meeting is None:
             raise ValueError("Meeting not found in this workspace.")
         return meeting, member, account
@@ -252,7 +254,7 @@ class Service:
     def list_meetings(self, user, q="", status=""):
         with self.Session() as s:
             _, member, _ = self._identity(s, user)
-            query = select(Meeting).where(Meeting.workspace_id == member.workspace_id, Meeting.deleted_at.is_(None))
+            query = select(Meeting).options(defer(Meeting.upload), defer(Meeting.transcript)).where(Meeting.workspace_id == member.workspace_id, Meeting.deleted_at.is_(None))
             if q:
                 query = query.where(Meeting.title.ilike("%" + q[:160].replace("%", "\\%").replace("_", "\\_") + "%", escape="\\"))
             if status in {"queued", "processing", "ready", "failed"}:
@@ -280,8 +282,8 @@ class Service:
         filename = Path(filename).name[:180]
         if source_type == "transcript":
             transcript = transcript.strip()
-            if not 40 <= len(transcript) <= MAX_TRANSCRIPT:
-                raise ValueError("Paste a transcript between 40 and 100,000 characters.")
+            if len(transcript) < 40 or len(transcript.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
+                raise ValueError("Add at least 40 characters, up to 20 MB of UTF-8 text.")
             source_url, file_bytes = "", None
         elif source_type == "youtube":
             source_url = validate_youtube_url(source_url)
@@ -290,7 +292,7 @@ class Service:
             if os.getenv("TRANSCRIPTION_BACKEND", "disabled") == "disabled":
                 raise ValueError("Audio transcription is not configured. Paste a transcript or configure a transcription provider in server secrets.")
             if not file_bytes or len(file_bytes) > MAX_UPLOAD:
-                raise ValueError("Upload a non-empty file up to 25 MB.")
+                raise ValueError("Upload a non-empty file up to 200 MB.")
             if Path(filename).suffix.lower() not in {".wav", ".mp3", ".m4a", ".mp4", ".webm", ".ogg", ".flac"}:
                 raise ValueError("Unsupported media format.")
             transcript, source_url = "", ""
@@ -486,8 +488,8 @@ class Service:
                         path = Path(temp) / ("source" + suffix)
                         path.write_bytes(source["upload"] or b"")
                         transcript = transcribe_file(str(path), source["language"])
-                if len(transcript) > MAX_TRANSCRIPT:
-                    raise IntelligenceError("Transcript exceeds the 100,000-character limit. Split the recording and retry.")
+                if len(transcript.encode("utf-8")) > MAX_TRANSCRIPT_BYTES:
+                    raise IntelligenceError("Transcript exceeds the 20 MB text capacity.")
                 # Preserve transcription before inference so a provider retry need not retranscribe.
                 with self.Session.begin() as s:
                     s.execute(update(Meeting).where(Meeting.id == meeting_id, Meeting.lease_token == token, Meeting.deleted_at.is_(None)).values(transcript=transcript, upload=None))

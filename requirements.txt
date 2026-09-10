@@ -10,3 +10,6 @@ fpdf2==2.8.8
 uharfbuzz==0.56.1
 Authlib==1.8.0
 youtube-transcript-api==1.2.4
+
+# Audio/video decoder and CPU speech inference; backend is enabled in secrets.
+faster-whisper==1.2.1

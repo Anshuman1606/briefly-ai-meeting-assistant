@@ -20,7 +20,7 @@ Use the actual repository URL and deployed commit in the deployment record once 
 
 ## Checks completed locally
 
-- 73 automated tests passed, including service authorization, workspace isolation, migrations, job recovery, and Streamlit interface workflows.
+- 78 automated tests passed, including service authorization, workspace isolation, migrations, job recovery, and Streamlit interface workflows.
 - Python lint passed and installed dependencies were consistent.
 - A runtime dependency audit covered 53 packages and reported no known vulnerabilities at implementation time. Re-run the audit in CI for the release.
 - A real audio upload was transcribed with local Whisper `tiny.en`, analyzed, and saved successfully.

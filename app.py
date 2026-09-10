@@ -269,23 +269,23 @@ def create_meeting(service, user):
             language = {"Automatic": "auto", "English": "en", "Hindi": "hi", "Hinglish": "hinglish"}[language_label]
             transcript, source_url, source_file = "", "", None
             if kind == "Transcript":
-                transcript = st.text_area("Meeting transcript", height=270, max_chars=100000, placeholder="[00:00] Maya: Let's review the launch plan…\n[00:30] Arjun: I will finish testing by Friday.")
+                transcript = st.text_area("Meeting transcript", height=270, placeholder="[00:00] Maya: Let's review the launch plan…\n[00:30] Arjun: I will finish testing by Friday.")
                 text_file = st.file_uploader("Or upload a transcript", type=["txt", "srt", "vtt"])
-                st.caption("40–100,000 characters. Timestamps and speaker names help preserve context.")
+                st.caption("At least 40 characters; text files up to 20 MB. Long transcripts are processed in batches. Timestamps and speaker names help preserve context.")
             elif kind == "YouTube":
                 source_url = st.text_input("YouTube video URL", placeholder="https://www.youtube.com/watch?v=…")
                 st.caption("Imports available captions. Restricted videos and videos without captions need a transcript instead.")
             else:
                 source_file = st.file_uploader("Audio or video file", type=["wav", "mp3", "m4a", "mp4", "webm", "ogg", "flac"])
-                st.caption("Up to 25 MB. Sarvam requires PCM WAV; Whisper supports the listed media formats.")
+                st.caption("Up to 200 MB and 12 hours. Sarvam requires PCM WAV; Whisper supports the listed media formats.")
                 if not service.capabilities()["audio_enabled"]:
                     st.info("Audio transcription needs an operator to configure Whisper or Sarvam. Transcript and YouTube imports are available now.")
             submitted = st.form_submit_button("Create meeting →", type="primary", width="stretch", disabled=user["role"] == "viewer" or (kind == "Audio / video" and not service.capabilities()["audio_enabled"]))
         if submitted:
             if kind == "Transcript":
                 if text_file is not None:
-                    if text_file.size > 500000:
-                        raise ValueError("Transcript files must be smaller than 500 KB.")
+                    if text_file.size > 20 * 1024 * 1024:
+                        raise ValueError("Transcript files must be up to 20 MB.")
                     try:
                         transcript = text_file.getvalue().decode("utf-8-sig")
                     except UnicodeDecodeError:
@@ -320,10 +320,19 @@ def processing_status(service, user, mid, initial_status):
     st.caption("You can leave this page. Processing continues while the app is running.")
 
 
+def page_items(items, key, size=20):
+    if len(items) <= size:
+        return items
+    pages = (len(items) + size - 1) // size
+    page = int(st.number_input("Page", min_value=1, max_value=pages, value=1, step=1, key=key + "_page"))
+    st.caption(f"Page {page} of {pages} · {len(items):,} results")
+    return items[(page - 1) * size:page * size]
+
+
 def render_actions(service, user, actions, key_prefix):
     if not actions:
         st.info("No explicit action items were found. Nothing to track yet.")
-    for action in actions:
+    for action in page_items(actions, key_prefix, 25):
         with st.container(border=True):
             body, toggle = st.columns([5, 1], vertical_alignment="center")
             with body:
@@ -371,13 +380,13 @@ def detail(service, user):
             with aside:
                 with st.container(border=True):
                     st.subheader("Decisions")
-                    for item in meeting["decisions"]:
+                    for item in page_items(meeting["decisions"], "decisions_" + mid):
                         paragraph(item)
                     if not meeting["decisions"]:
                         st.caption("No explicit decisions found.")
                 with st.container(border=True):
                     st.subheader("Still open")
-                    for item in meeting["questions"]:
+                    for item in page_items(meeting["questions"], "questions_" + mid):
                         paragraph(item)
                     if not meeting["questions"]:
                         st.caption("No explicit open questions found.")
@@ -389,7 +398,7 @@ def detail(service, user):
             find = st.text_input("Find in transcript", placeholder="Search for a phrase…")
             segments = [c for c in meeting["chunks"] if find.casefold() in c["text"].casefold()]
             st.caption(f"{len(segments)} segments · segment numbers match answer citations")
-            for chunk in segments:
+            for chunk in page_items(segments, "transcript_" + mid + find, 50):
                 time = int(chunk.get("start") or 0)
                 label = f"{time // 60:02d}:{time % 60:02d}" if time else "Source"
                 st.markdown(f"**[{chunk['index'] + 1}] · {label}**")
