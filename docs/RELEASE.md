@@ -1,6 +1,6 @@
 # Streamlit release handoff
 
-The application is published in the private [GitHub repository](https://github.com/Anshuman1606/briefly-ai-meeting-assistant) and prepared for Streamlit Community Cloud. The hosted application is not live yet.
+The application is published in the private [GitHub repository](https://github.com/Anshuman1606/briefly-ai-meeting-assistant) and deployed at [Briefly on Streamlit](https://briefly-anshuman1606.streamlit.app/).
 
 ## Release settings
 
@@ -16,28 +16,25 @@ The application is published in the private [GitHub repository](https://github.c
 | Database | External PostgreSQL; TLS according to the provider's instructions |
 | Background processing | Embedded worker enabled on Community Cloud |
 
-Use the actual repository URL and deployed commit in the deployment record once GitHub and Streamlit are connected. Do not publish a generated database, model cache, real secrets, or test recordings.
+The verified code release is `7edd13b9dadea513471f9a1a7cc9470b0ee5d60f`; see the deployment record for hosting settings. Do not publish a generated database, model cache, real secrets, or test recordings.
 
 ## Checks completed locally
 
 - 78 automated tests passed, including service authorization, workspace isolation, migrations, job recovery, and Streamlit interface workflows.
 - Python lint passed and installed dependencies were consistent.
-- A runtime dependency audit covered 53 packages and reported no known vulnerabilities at implementation time. Re-run the audit in CI for the release.
+- The current runtime dependency audit reported no known vulnerabilities. Re-run the audit in CI for the release.
 - A real audio upload was transcribed with local Whisper `tiny.en`, analyzed, and saved successfully.
 - TXT, JSON and PDF reports were generated. English and Hindi Unicode PDF generation succeeded.
 - The local Streamlit health endpoint returned HTTP 200.
 
-GitHub Actions also passed the PostgreSQL 17 integration test on 2026-09-10, covering migrations, tenant isolation, PDF/JSON exports, and persistence after a real database restart. The [verified CI run](https://github.com/Anshuman1606/briefly-ai-meeting-assistant/actions/runs/34456624224) tests code release `9d1d5a76e890996a43b521e85191967a052a625c`.
+GitHub Actions passed all 78 tests, lint, dependency audit, and PostgreSQL 17 integration checks for [the deployed code release](https://github.com/Anshuman1606/briefly-ai-meeting-assistant/actions/runs/34491982783). Database checks cover migrations, tenant isolation, PDF/JSON exports and persistence after a real database restart.
 
-These checks do not establish an enterprise SLA, production load capacity, or compliance certification. The full Docker deployment, live Mistral/Sarvam requests, organization SSO, and hosted browser checks remain unverified until their services are available. PDF generation was exercised; a separate visual layout review was not performed.
+On the hosted app, the owner signed in and processed a sample meeting. The cloud worker processed a 145,351-character transcript (2,401 segments), retained its final-section evidence for questions, and successfully transcribed real public speech audio using Whisper `tiny`. The app recovered from Community Cloud sleep and displayed its sign-in page again. A separate database reconnection confirmed retained transcripts and owner authentication; service TXT, JSON and PDF exports succeeded against the hosted records.
 
-## Account-dependent steps still required
+These checks do not establish an enterprise SLA, production load capacity, or compliance certification. The full Docker deployment, live Mistral/Sarvam requests, and organization SSO remain unverified. PDF generation was exercised; a separate visual layout review was not performed.
 
-1. Completed: private GitHub repository created under `Anshuman1606`.
-2. Completed: release pushed and GitHub Actions passed, including the PostgreSQL integration job.
-3. Connect the repository in Streamlit Community Cloud.
-4. Configure a dedicated PostgreSQL connection in app secrets. Keep `APP_ENV="production"` and `ALLOW_SIGNUP=false`.
-5. Provision the initial owner with the operator CLI, or configure verified organization OIDC. Enable optional provider integrations only after their credentials and limits are configured.
-6. Deploy `app.py`, verify persistence and the hosted workflow, and record the real URL and commit in `docs/DEPLOYMENT.md`.
+## Deployment complete
 
-Follow [DEPLOYMENT.md](DEPLOYMENT.md) for the exact configuration, verification and rollback steps.
+The private repository is connected to Streamlit, the Neon connection is in private app settings, and the owner account is provisioned with signup disabled. CPU Whisper is enabled. Mistral, Sarvam and organizational OIDC remain optional and unconfigured.
+
+The owner login file is provided separately to the user and is not included in GitHub or the release archive. Follow [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment record, operating limits, verification and rollback.

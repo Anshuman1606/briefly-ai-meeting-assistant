@@ -61,7 +61,7 @@ python -m pip install -r requirements-whisper.txt
 4. Paste the populated secrets example into Advanced settings. A persistent pilot needs `APP_ENV="production"`, an external PostgreSQL `DATABASE_URL`, `ALLOW_SIGNUP=false`, and `BRIEFLY_EMBEDDED_WORKER=true`.
 5. Provision the initial authorized account as described below, deploy, and complete the hosted smoke tests in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-The remaining account-dependent steps require access to the user's GitHub/Streamlit accounts and a real PostgreSQL service. This repository does not contain those credentials or a pre-existing hosted URL. Community Cloud's UI supplies the actual `streamlit.app` URL when deployment succeeds. [Official deployment instructions](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy).
+The application is live at [Briefly on Streamlit](https://briefly-anshuman1606.streamlit.app/) with external Neon PostgreSQL and CPU Whisper. Owner credentials are provided privately outside this repository. See [the deployment record](docs/DEPLOYMENT.md#deployment-record) for the verified release, checks and current limitations.
 
 Community Cloud is suitable for evaluating this workflow with bounded workloads. It can sleep, has shared resource limits, and provides no application filesystem persistence guarantee. Use external PostgreSQL and the operations runbook. For continuous workers and stronger availability requirements, operate the container topology with an HTTPS ingress, monitoring, and database backups. [Community Cloud operations](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app), [runtime file persistence](https://docs.streamlit.io/develop/concepts/configuration/serving-static-files).
 

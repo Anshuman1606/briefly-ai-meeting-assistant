@@ -30,7 +30,7 @@ Run the checks documented in the root README before pushing the deployment branc
 5. Open **Advanced settings**, explicitly select **Python 3.13**, matching this project's validation runtime, and paste the deployment TOML secrets.
 6. Save the settings and choose **Deploy**. Watch the build and application logs until the application loads successfully.
 
-Community Cloud currently defaults to Python 3.12 and supports released Python versions receiving security updates. The deployment page produces the actual `streamlit.app` URL; a proposed subdomain alone is not evidence of deployment. [Deployment workflow](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy).
+Select Python 3.13 explicitly; the deployment form displayed Python 3.14 by default during this release. The deployment page produces the actual `streamlit.app` URL; a proposed subdomain alone is not evidence of deployment. [Deployment workflow](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy).
 
 ## Configure secrets and identity
 
@@ -150,17 +150,23 @@ Monitor the application error rate, request latency, provider failures, database
 
 ## Deployment record
 
-Fill this in when the hosted release is verified:
+Verified hosted release on 2026-09-11:
 
 | Field | Verified value |
 | --- | --- |
 | GitHub repository | [Anshuman1606/briefly-ai-meeting-assistant](https://github.com/Anshuman1606/briefly-ai-meeting-assistant), private |
-| Deployment branch and commit | `codex/briefly`; code release `9d1d5a76e890996a43b521e85191967a052a625c` |
-| Python version | 3.13, verified in GitHub Actions |
-| Hosted application URL | Pending |
-| Database and backup owner | Pending |
-| Access mode / identity provider | Pending |
-| Smoke-test time and result | GitHub CI passed on 2026-09-10 at 08:44 UTC, including PostgreSQL migrations, isolation, exports and restart recovery. Hosted Streamlit smoke tests remain pending. |
-| Rollback commit | Pending |
+| Deployment branch and code commit | `codex/briefly`; `7edd13b9dadea513471f9a1a7cc9470b0ee5d60f` |
+| Python version | 3.13, selected in Streamlit and verified in GitHub Actions |
+| Hosted application URL | [Briefly](https://briefly-anshuman1606.streamlit.app/) |
+| Database | Existing Neon Free project `briefly`, PostgreSQL 18, production branch; TLS and channel binding required |
+| Access mode | Provisioned password owner; public self-registration and demo sessions disabled; organizational OIDC not configured |
+| Processing | Embedded cloud worker; Whisper `tiny` on CPU with int8; model download enabled for ephemeral host restarts |
+| Analysis | Extractive analysis; Mistral and Sarvam credentials are not configured |
+| GitHub validation | [78 tests, lint, audit and PostgreSQL integration passed](https://github.com/Anshuman1606/briefly-ai-meeting-assistant/actions/runs/34491982783) |
+| Hosted checks | Owner sign-in and sample meeting results verified in browser. Cloud worker processed 145,351 characters / 2,401 segments, and transcribed real public speech audio. Retrieval verified a fact in the final section. App woke successfully after inactivity. A separate database connection verified retained records, owner authentication and service TXT/JSON/PDF exports. |
+| Backup operations | Neon plan recovery features apply; no independent scheduled backup or disaster-recovery exercise has been configured |
+| Rollback baseline | `7edd13b9dadea513471f9a1a7cc9470b0ee5d60f` is the first verified hosted code release; later documentation commits do not change runtime behavior |
 
-Official hosting documentation reviewed on 2026-09-09. Recheck provider documentation before later deployments because platform defaults and limits can change.
+Secrets and the owner login are stored outside the repository and release ZIP. No database password or login password belongs in this record. The application's configured capacity is 20 MB of UTF-8 text or 200 MB / 12 hours of media. These upper bounds are not a load-test result; see [LARGE_INPUTS.md](LARGE_INPUTS.md) for batching and hosting limitations. Large uploads temporarily use the limited Neon Free database storage.
+
+Community Cloud may sleep after inactivity. Open the application and choose the wake-up button when shown; meetings remain in external PostgreSQL. This deployment is a functioning pilot, with no enterprise SLA or compliance certification claimed.
