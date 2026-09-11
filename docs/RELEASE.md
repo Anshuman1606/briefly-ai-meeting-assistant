@@ -35,6 +35,6 @@ These checks do not establish an enterprise SLA, production load capacity, or co
 
 ## Deployment complete
 
-The private repository is connected to Streamlit, the Neon connection is in private app settings, and the owner account is provisioned with signup disabled. CPU Whisper is enabled. Mistral, Sarvam and organizational OIDC remain optional and unconfigured.
+The private repository is connected to Streamlit, the Neon connection is in private app settings, and the owner account is provisioned. Self-registration is enabled at the user’s request, with a separate private workspace for each new account. CPU Whisper is enabled. Mistral, Sarvam and organizational OIDC remain optional and unconfigured.
 
 The owner login file is provided separately to the user and is not included in GitHub or the release archive. Follow [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment record, operating limits, verification and rollback.

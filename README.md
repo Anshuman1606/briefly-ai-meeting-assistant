@@ -58,10 +58,10 @@ python -m pip install -r requirements-whisper.txt
 1. Publish this directory as a GitHub repository. Keep secrets and local data excluded.
 2. Sign in to [Streamlit Community Cloud](https://share.streamlit.io/) and authorize access to that repository.
 3. Create an app using the intended branch and `app.py`; choose Python **3.13** in Advanced settings.
-4. Paste the populated secrets example into Advanced settings. A persistent pilot needs `APP_ENV="production"`, an external PostgreSQL `DATABASE_URL`, `ALLOW_SIGNUP=false`, and `BRIEFLY_EMBEDDED_WORKER=true`.
+4. Paste the populated secrets example into Advanced settings. A persistent pilot needs `APP_ENV="production"`, an external PostgreSQL `DATABASE_URL`, `ALLOW_SIGNUP=true` for new-user registration, and `BRIEFLY_EMBEDDED_WORKER=true`.
 5. Provision the initial authorized account as described below, deploy, and complete the hosted smoke tests in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-The application is live at [Briefly on Streamlit](https://briefly-anshuman1606.streamlit.app/) with external Neon PostgreSQL and CPU Whisper. Owner credentials are provided privately outside this repository. See [the deployment record](docs/DEPLOYMENT.md#deployment-record) for the verified release, checks and current limitations.
+The application is live at [Briefly on Streamlit](https://briefly-anshuman1606.streamlit.app/) with external Neon PostgreSQL and CPU Whisper. New users can select **Create account** on the login page to create their own private workspace. The initial owner credentials are provided privately outside this repository. See [the deployment record](docs/DEPLOYMENT.md#deployment-record) for the verified release, checks and current limitations.
 
 Community Cloud is suitable for evaluating this workflow with bounded workloads. It can sleep, has shared resource limits, and provides no application filesystem persistence guarantee. Use external PostgreSQL and the operations runbook. For continuous workers and stronger availability requirements, operate the container topology with an HTTPS ingress, monitoring, and database backups. [Community Cloud operations](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app), [runtime file persistence](https://docs.streamlit.io/develop/concepts/configuration/serving-static-files).
 
@@ -76,7 +76,7 @@ export ALLOW_SIGNUP=false
 python -m briefly.cli create-owner
 ```
 
-`DATABASE_URL` must already be set in that shell by your secret manager or secure environment setup. The CLI reads environment variables, not Streamlit's TOML file. It prompts for username, email, workspace, and a confirmed password without echoing the password. It creates an owner and closes the temporary provisioning session. `ALLOW_SIGNUP` remains disabled for the web app.
+`DATABASE_URL` must already be set in that shell by your secret manager or secure environment setup. The CLI reads environment variables, not Streamlit's TOML file. It prompts for username, email, workspace, and a confirmed password without echoing the password. It creates an owner and closes the temporary provisioning session. The CLI does not change the deployed `ALLOW_SIGNUP` setting.
 
 For a shared production team, use `AUTH_MODE=oidc`, configure Streamlit's `[auth]` block, and require an approved `OIDC_ALLOWED_DOMAINS` allowlist. Users first sign in through the identity provider; an owner can then add their registered email as an editor or viewer. Production password mode does not support adding team members because password registrations do not verify email ownership. The [deployment runbook](docs/DEPLOYMENT.md#configure-secrets-and-identity) explains OIDC setup and session behavior.
 

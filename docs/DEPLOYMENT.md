@@ -42,7 +42,7 @@ Start from the following deployment configuration. Every placeholder needs a rea
 APP_ENV = "production"
 DATABASE_URL = "postgresql+psycopg://APP_USER:APP_PASSWORD@DB_HOST:5432/briefly?sslmode=require"
 AUTH_MODE = "password"
-ALLOW_SIGNUP = false
+ALLOW_SIGNUP = true
 
 # Required only for the corresponding optional provider.
 # MISTRAL_API_KEY = "replace-with-provider-key"
@@ -62,7 +62,7 @@ BRIEFLY_EMBEDDED_WORKER = true
 | `APP_ENV` | Set `production` for the hosted team pilot. Production requires PostgreSQL and disables the demo. |
 | `DATABASE_URL` | Use `postgresql+psycopg://...`; PostgreSQL aliases are normalized by the application. Require TLS according to your database provider's connection instructions. |
 | `AUTH_MODE` | `password` by default, or `oidc` for the identity provider integration. |
-| `ALLOW_SIGNUP` | Set `false` in production. Local development permits signup by default. Provision the initial password owner using `python -m briefly.cli create-owner` from a trusted environment configured for the same PostgreSQL database. |
+| `ALLOW_SIGNUP` | Set `true` to display Create account and create separate private workspaces. Set `false` for administrator-provisioned accounts. Provision the initial password owner using `python -m briefly.cli create-owner` from a trusted environment configured for the same PostgreSQL database. |
 | `MISTRAL_API_KEY`, `MISTRAL_MODEL` | Configure the Mistral integration. Without a key, output uses the explicitly labeled extractive mode; it is not a provider-generated AI summary. |
 | `TRANSCRIPTION_BACKEND` | `disabled` by default, `whisper` for local model inference, or `sarvam` for the Sarvam API. Text transcripts remain usable when audio transcription is disabled. |
 | `WHISPER_MODEL` | Local Whisper model name or provisioned model directory; default `small`. Install `requirements-whisper.txt` separately. Validate memory and execution time before enabling on Community Cloud. |
@@ -72,7 +72,7 @@ BRIEFLY_EMBEDDED_WORKER = true
 
 Production startup should be treated as incomplete until the PostgreSQL connection, initial authorized account, and selected integrations work. Setting a production flag alone does not verify these services.
 
-The administrative CLI and standalone worker read environment variables. Streamlit's secrets loader makes root TOML settings available to the web app; putting a URL in `.streamlit/secrets.toml` alone does not configure a separate CLI process. Set `DATABASE_URL`, `APP_ENV=production`, and `AUTH_MODE=password` through the operator's trusted environment, then run `python -m briefly.cli create-owner`. The command prompts for the account details and a confirmed password without echoing it. Keep `ALLOW_SIGNUP=false` in the deployed app. See the [README provisioning instructions](../README.md#initial-account-and-organizational-sign-in).
+The administrative CLI and standalone worker read environment variables. Streamlit's secrets loader makes root TOML settings available to the web app; putting a URL in `.streamlit/secrets.toml` alone does not configure a separate CLI process. Set `DATABASE_URL`, `APP_ENV=production`, and `AUTH_MODE=password` through the operator's trusted environment, then run `python -m briefly.cli create-owner`. The command prompts for the account details and a confirmed password without echoing it. For administrator-provisioned accounts only, keep `ALLOW_SIGNUP=false` in the deployed app. See the [README provisioning instructions](../README.md#initial-account-and-organizational-sign-in).
 
 Production password mode supports the provisioned owner workflow. Adding production team members requires OIDC because locally registered password accounts do not verify email ownership. In OIDC mode, each approved user first signs in through the identity provider; an owner can then add that user's registered email as an editor or viewer in the intended workspace.
 
@@ -159,7 +159,7 @@ Verified hosted release on 2026-09-11:
 | Python version | 3.13, selected in Streamlit and verified in GitHub Actions |
 | Hosted application URL | [Briefly](https://briefly-anshuman1606.streamlit.app/) |
 | Database | Existing Neon Free project `briefly`, PostgreSQL 18, production branch; TLS and channel binding required |
-| Access mode | Provisioned password owner; public self-registration and demo sessions disabled; organizational OIDC not configured |
+| Access mode | Password accounts with self-registration enabled (`ALLOW_SIGNUP=true`); each registration creates a separate private workspace. Demo sessions remain disabled; organizational OIDC not configured |
 | Processing | Embedded cloud worker; Whisper `tiny` on CPU with int8; model download enabled for ephemeral host restarts |
 | Analysis | Extractive analysis; Mistral and Sarvam credentials are not configured |
 | GitHub validation | [78 tests, lint, audit and PostgreSQL integration passed](https://github.com/Anshuman1606/briefly-ai-meeting-assistant/actions/runs/34491982783) |
@@ -170,3 +170,7 @@ Verified hosted release on 2026-09-11:
 Secrets and the owner login are stored outside the repository and release ZIP. No database password or login password belongs in this record. The application's configured capacity is 20 MB of UTF-8 text or 200 MB / 12 hours of media. These upper bounds are not a load-test result; see [LARGE_INPUTS.md](LARGE_INPUTS.md) for batching and hosting limitations. Large uploads temporarily use the limited Neon Free database storage.
 
 Community Cloud may sleep after inactivity. Open the application and choose the wake-up button when shown; meetings remain in external PostgreSQL. This deployment is a functioning pilot, with no enterprise SLA or compliance certification claimed.
+
+### Registration setting
+
+The live app now enables `ALLOW_SIGNUP=true` at the user’s request. Its login page displays **Create account**, with username, email, workspace name and password confirmation. Registration creates a new workspace owned by that user; it does not grant membership in an existing workspace. Email addresses are not verified in password mode. Set this flag to false only when intentionally operating with administrator-provisioned accounts. When the flag is omitted, the service defaults to disabled in production.
